@@ -27,15 +27,13 @@ Uma arquitetura integrada onde um Webhook recebe a mensagem do cliente, envia pa
 
 ### Documentação Visual do Fluxo
 * **PDF Contendo imagens e explicação**
-  ![PDF] (docs/00_etapas_explicadas.pdf)
+  ![PDF] (docs/info/fluxo_n8n_explicado.pdf)
 * **Fluxo Completo:**
-  ![Fluxo Completo](docs/01_fluxo_completo.png)
-* **Execução Bem-Sucedida:**
-  ![Execução](docs/02_execucao_sucesso.png)
-* **Configuração Interna dos Nodes (Webhook, HTTP Request e Switch):**
-  ![Configuração](docs/03_config_nodes.png)
-* **Resultados e Dados Processados (Saída JSON):**
-  ![Resultados](docs/04_resultados_dados.png)
+  ![Fluxo Completo](docs/img/fluxo_completo_testado.png)
+> Você pode encontrar mais detalhes sobre os tópicos abaixo em (docs/info) e evidências em (docs/img).
+* **Execução Requisição**
+* **Configuração Interna dos Nodes (Webhook, HTTP Request e Switch)**
+* **Resultados e Dados Processados (Saída JSON)**
 
 ## 6. Como Executar
 1. Clone o repositório e acesse a pasta do projeto.

@@ -20,7 +20,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "[http://host.docker.internal:8000/classificar](http://host.docker.internal:8000/classificar)",
+        "url": "http://host.docker.internal:8000/classificar",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\n  \"cliente\": \"{{ $json.body.cliente }}\",\n  \"mensagem\": \"{{ $json.body.mensagem }}\"\n}",

@@ -1,0 +1,170 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Classificador Inteligente de Mensagens de Atendimento</title><style>
+@page { size: A4; margin: 15mm 16mm 16mm; }
+* { box-sizing: border-box; }
+body { color: #202124; font-family: Arial, "Segoe UI", sans-serif; font-size: 10pt; line-height: 1.48; }
+h1 { font-size: 23pt; line-height: 1.18; margin: 0 0 12pt; }
+h2 { font-size: 16pt; margin-top: 22pt; border-bottom: 1px solid #d5d9de; padding-bottom: 4pt; }
+h3 { font-size: 13pt; margin-top: 18pt; }
+h4 { font-size: 11pt; margin-top: 14pt; }
+h1, h2, h3, h4 { break-after: avoid-page; color: #172b4d; }
+p, li { orphans: 3; widows: 3; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #f3f5f7; border: 1px solid #dfe3e8; border-radius: 4px; padding: 8pt; font-size: 8.5pt; line-height: 1.35; break-inside: avoid; }
+code { font-family: Consolas, "Courier New", monospace; font-size: .92em; overflow-wrap: anywhere; }
+:not(pre) > code { background: #f1f3f4; padding: 1px 3px; border-radius: 3px; }
+blockquote { margin: 10pt 0; padding: 2pt 10pt; border-left: 3px solid #9aa8b7; color: #3c4652; }
+img { display: block; max-width: 100%; max-height: 235mm; width: auto; height: auto; object-fit: contain; margin: 10pt auto 14pt; break-inside: avoid; }
+p:has(> img) { break-inside: avoid; text-align: center; }
+a { color: #145ea8; text-decoration: none; }
+hr { border: 0; border-top: 1px solid #d5d9de; margin: 18pt 0; }
+ul, ol { padding-left: 22pt; }
+</style></head><body><h1 id="classificador-inteligente-de-mensagens-de-atendimento">Classificador Inteligente de Mensagens de Atendimento</h1>
+<p>Solução de Inteligência Artificial e Automação desenvolvida como projeto integrador para triagem, classificação e roteamento automático de mensagens de clientes.</p>
+<hr />
+<h2 id="fluxo-n8n">Fluxo N8N</h2>
+<ol>
+<li>Um <strong>Webhook</strong> no n8n recebe a mensagem do cliente em formato JSON.</li>
+<li>O fluxo envia os dados para uma <strong>API REST em Python (FastAPI)</strong>, que aplica engenharia de prompt estruturada e utiliza o modelo <strong>Google Gemini</strong> com <em>Structured Outputs</em> (validado via Pydantic) para classificar a mensagem estritamente em JSON (<code>categoria</code>, <code>prioridade</code>, <code>setor_destino</code> e <code>resumo_curto</code>).</li>
+<li>O <strong>n8n</strong> interpreta o retorno da IA e utiliza um roteador condicional (<strong>Switch</strong>) para encaminhar automaticamente o atendimento à fila do departamento correspondente (<code>Financeiro</code>, <code>Suporte Técnico</code> ou <code>Comercial</code>).</li>
+</ol>
+<h2 id="funcionamento-do-sistema">Funcionamento do Sistema</h2>
+<h3 id="arquitetura-e-fluxo-de-dados">Arquitetura e Fluxo de Dados</h3>
+<pre><code class="language-text">──▶ [1. Webhook (POST)] 
+──▶ [2. HTTP Request (FastAPI + Gemini)] 
+──▶ [3. Switch (Setor)] 
+──┬──▶ [4A. Set - Financeiro]
+  ├──▶ [4B. Set - Suporte Técnico]
+  └──▶ [4C. Set - Comercial]
+</code></pre>
+<ol>
+<li>
+<p><strong>Recepção (API FastAPI):</strong> O endpoint <code>POST /classificar</code> recebe um payload JSON contendo <code>cliente</code> e <code>mensagem</code>, valida os tipos de entrada com Pydantic e injeta os dados em um prompt com regras estritas de classificação.</p>
+</li>
+<li>
+<p><strong>Processamento com IA:</strong> O modelo <code>gemini-2.5-flash</code> analisa o contexto da mensagem com baixa temperatura (<code>0.1</code>) e retorna um objeto JSON garantido pelo schema <code>ClassificacaoSaida</code>.</p>
+</li>
+<li>
+<p><strong>Execução da Automação (n8n):</strong> O fluxo escuta chamadas externas no Webhook <code>/atendimento</code>, consulta a API local (<code>http://localhost:8000/classificar</code>), avalia o campo <code>setor_destino</code> no node <em>Switch</em> e registra o encaminhamento na fila do setor específico.</p>
+</li>
+</ol>
+<hr />
+<h3 id="documentacao-visual-e-explicacao-tecnica-dos-nodes">Documentação Visual e Explicação Técnica dos Nodes</h3>
+<p>O workflow está descrito em <a href="./fluxo_n8n.json"><code>fluxo_n8n.json</code></a>. A sequência é <strong>Postman → Webhook do n8n → API FastAPI/Gemini → Switch → Set do setor</strong>. O Postman chama o Webhook do n8n; é o node HTTP Request que, em seguida, chama a API de classificação.</p>
+<p><img alt="Fluxo completo no n8n" src="../img/fluxo_completo_testado.png" /></p>
+<h4 id="1-envio-da-requisicao-pelo-postman">1. Envio da requisição pelo Postman</h4>
+<p>No Postman, use o método <code>POST</code> e a URL do Webhook de teste:</p>
+<pre><code class="language-text">http://localhost:5678/webhook-test/atendimento
+</code></pre>
+<p>O caminho <code>/webhook-test/</code> é usado enquanto o workflow está aguardando uma execução de teste no editor do n8n. Para um workflow ativo, usa-se a URL de produção <code>/webhook/atendimento</code>. Envie o corpo como JSON, com <code>Content-Type: application/json</code> e os campos esperados pelo endpoint:</p>
+<pre><code class="language-json">{
+  &quot;cliente&quot;: &quot;João Silva&quot;,
+  &quot;mensagem&quot;: &quot;Minha fatura veio cobrando o dobro esse mês, preciso de estorno urgente!&quot;
+}
+</code></pre>
+<p><img alt="Requisição POST de teste no Postman" src="../img/postman_send_header.png" /></p>
+<h4 id="2-recebimento-pelo-webhook">2. Recebimento pelo Webhook</h4>
+<p>O node <code>Webhook</code> (<code>n8n-nodes-base.webhook</code>) é o gatilho de entrada. Ele recebe o <code>POST</code> no path <code>atendimento</code> e disponibiliza o corpo recebido em <code>$json.body</code>; por isso, os campos são lidos como <code>$json.body.cliente</code> e <code>$json.body.mensagem</code>. A porta <code>5678</code> pertence ao n8n, não à API FastAPI.</p>
+<p><img alt="Execução do Webhook no n8n" src="../img/primeiro_passo_n8n_webhook.png" /></p>
+<h4 id="3-chamada-a-api-e-classificacao">3. Chamada à API e classificação</h4>
+<p>O node <code>HTTP Request - API IA</code> (<code>n8n-nodes-base.httpRequest</code>) envia uma segunda requisição <code>POST</code>, agora para o endpoint FastAPI <code>/classificar</code>. Como o n8n está em Docker e a API está acessível no host, a URL prevista na configuração é:</p>
+<pre><code class="language-text">http://host.docker.internal:8000/classificar
+</code></pre>
+<p>O node envia um corpo JSON usando os valores do Webhook:</p>
+<pre><code class="language-json">{
+  &quot;cliente&quot;: &quot;{{ $json.body.cliente }}&quot;,
+  &quot;mensagem&quot;: &quot;{{ $json.body.mensagem }}&quot;
+}
+</code></pre>
+<p>A API valida a entrada com <code>MensagemEntrada</code>, monta o prompt e solicita ao Gemini uma classificação estruturada. A resposta contém <code>categoria</code>, <code>prioridade</code>, <code>setor_destino</code> e <code>resumo_curto</code>; esses dados são então entregues ao Switch. <strong>Observação:</strong> no arquivo JSON do workflow, o valor do campo <code>url</code> está atualmente escrito com sintaxe de link Markdown, em vez de uma URL literal. Para executar o workflow importado, esse campo precisa conter apenas a URL acima.</p>
+<p><img alt="Configuração e resposta do HTTP Request" src="../img/segundo_passo_http_request_png.png" /></p>
+<h4 id="4-roteamento-pelo-switch">4. Roteamento pelo Switch</h4>
+<p>O node <code>Switch - Roteamento Setor</code> (<code>n8n-nodes-base.switch</code>) avalia <code>$json.setor_destino</code> e compara o resultado com <code>Financeiro</code>, <code>Suporte Técnico</code> e <code>Comercial</code>. O item segue pela saída correspondente ao valor recebido. Esse roteamento escolhe um ramo dentro do workflow; não envia, por si só, uma mensagem a uma fila ou sistema externo.</p>
+<p><img alt="Roteamento do setor Financeiro" src="../img/terceiro_passo_roteamento1.png" /></p>
+<p><img alt="Roteamento do setor Suporte T?cnico" src="../img/terceiro_passo_roteamento2_Suporte_Tecnico.png" /></p>
+<p><img alt="Roteamento do setor Comercial" src="../img/terceiro_passo_roteamento3.png" /></p>
+<h4 id="5-preparacao-do-resultado-pelo-node-set">5. Preparação do resultado pelo node Set</h4>
+<p>Cada saída do Switch conecta ao node Set do respectivo setor. O Set mantém os campos recebidos (<code>includeOtherFields: true</code>) e adiciona <code>status_encaminhamento</code>, por exemplo:</p>
+<pre><code class="language-text">Encaminhado para fila do setor: Financeiro (Prioridade: Alta)
+</code></pre>
+<p>Esse campo registra o resultado do roteamento; os nodes Set não integram com um sistema de filas externo. A saída final do ramo contém os dados da classificação e o novo status, por exemplo:</p>
+<pre><code class="language-json">{
+  &quot;categoria&quot;: &quot;Reclamação&quot;,
+  &quot;prioridade&quot;: &quot;Alta&quot;,
+  &quot;setor_destino&quot;: &quot;Financeiro&quot;,
+  &quot;resumo_curto&quot;: &quot;Fatura com cobrança indevida solicitando estorno urgente&quot;,
+  &quot;status_encaminhamento&quot;: &quot;Encaminhado para fila do setor: Financeiro (Prioridade: Alta)&quot;
+}
+</code></pre>
+<p>Os campos de classificação variam conforme a mensagem recebida. O resultado da execução pode ser conferido na saída do node Set executado:</p>
+<p><img alt="Resultado do setor Financeiro" src="../img/quarto_passo_set_final_1.png" />
+<img alt="Resultado do setor Suporte Técnico" src="../img/quarto_passo_set_final_2.png" />
+<img alt="Resultado do setor Comercial" src="../img/quarto_passo_set_final_3.png" /></p>
+<h4 id="resposta-recebida-pelo-postman">Resposta recebida pelo Postman</h4>
+<p>No workflow atual, o Webhook usa a resposta padrão do n8n, que confirma o recebimento sem aguardar a conclusão dos nodes seguintes. Por isso, o Postman recebe uma confirmação HTTP — na captura, <code>200 OK</code> com <code>{"message":"Workflow was started"}</code> — e não o JSON final da classificação. O resultado final fica disponível nos dados da execução no n8n. Para devolver esse resultado ao cliente HTTP, o workflow precisa ser configurado para responder após os nodes finais, por exemplo, com um node <code>Respond to Webhook</code>.</p>
+<h4 id="outras-evidncias">Outras evid?ncias</h4>
+<p><img alt="UviCorn_Rodando_a_API_local" src="../img/terminal_logs.png" />
+<img alt="Docker_Container_Running" src="../img/n8n_docker_running.png" />
+<img alt="Docker_Image_n8n" src="../img/images_docker.png" /></p>
+<hr />
+<h2 id="6-como-executar">6. Como Executar</h2>
+<h3 id="pre-requisitos">Pré-requisitos</h3>
+<ul>
+<li>Python 3.10 ou superior</li>
+<li>Node.js 22 ou abaixo 26 (para execução local do n8n)</li>
+<li>Chave de API gratuita do Google AI Studio (<code>GEMINI_API_KEY</code>)</li>
+</ul>
+<h3 id="passo-a-passo-para-instalacao-e-execucao">Passo a Passo para Instalação e Execução</h3>
+<ol>
+<li>
+<p><strong>Clone o repositório e acesse a pasta do projeto:</strong>
+   <code>bash
+   git clone https://github.com/GiovanniMontinOFC/classificador-mensagens-ia-automacao
+   cd /classificador-mensagens-ia-automacao</code></p>
+</li>
+<li>
+<p><strong>Crie e ative o ambiente virtual Python:</strong>
+   <code>bash
+   python -m venv venv
+   # No Windows:
+   venv\Scripts\activate
+   # No Linux/Mac:
+   source venv/bin/activate</code></p>
+</li>
+<li>
+<p><strong>Instale as dependências da API:</strong>
+   <code>bash
+   pip install -r requirements.txt</code></p>
+</li>
+<li>
+<p><strong>Configure as variáveis de ambiente:</strong>
+   * Copie o arquivo <code>.env.example</code> para um novo arquivo chamado <code>.env</code>:
+     <code>bash
+     cp .env.example .env</code>
+   * Abra o arquivo <code>.env</code> e insira sua chave da API do Gemini:
+     <code>env
+     GEMINI_API_KEY=sua_chave_api_aqui</code>
+   * Para ter sua chave de api, cadastre-se gratuitamente no site da ia do gemini, procure por Get API Key e comece sua jornada! 
+   - Site: https://aistudio.google.com/</p>
+</li>
+<li>
+<p><strong>Inicie o servidor da API FastAPI:</strong>
+   <code>bash
+   uvicorn main:app --reload --port 8000</code>
+   A API ficará disponível em <code>http://localhost:8000</code> (documentação interativa em <code>http://localhost:8000/docs</code>).</p>
+</li>
+<li>
+<p><strong>Inicie o n8n e importe o fluxo:</strong>
+   * Em um segundo terminal, execute:
+     <code>bash
+     npx n8n</code>
+   * Acesse <code>http://localhost:5678</code> no navegador, crie um novo workflow, clique no menu <strong><code>...</code> &gt; Import from File...</strong> e selecione o arquivo <code>fluxo_n8n.json</code> localizado na raiz deste repositório.</p>
+</li>
+<li>
+<p><strong>Teste a integração:</strong>
+   * Clique em <strong>Test Workflow</strong> no n8n e envie uma requisição <code>POST</code> para <code>http://localhost:5678/webhook-test/atendimento</code> com o seguinte corpo JSON:
+     <code>json
+     {
+       "cliente": "João Silva",
+       "mensagem": "Minha fatura veio cobrando o dobro esse mês, preciso de estorno urgente!"
+     }</code></p>
+</li>
+</ol></body></html>
