@@ -1,7 +1,9 @@
 # Classificador Inteligente de Mensagens de Atendimento
 
 > PROJETO KODIE ACADEMY 
+
 > DESAFIO MÓDULO 1 E 2
+
 > AUTOR: Giovanni Montin Barbosa
 
 ## 1. Apresentação da Ideia (StoryTelling) 
